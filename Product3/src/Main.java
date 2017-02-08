@@ -119,10 +119,8 @@ public class Main {
 			}
 			
 			//Send frame via live-feed
-			Mat camImageDown = new Mat();
-			Imgproc.pyrDown(camImage, camImageDown);
-			BufferedImage camimgDown = matToBufferedImage(camImageDown);
-			sendingFrame.frame = camimgDown;
+			BufferedImage camimg = matToBufferedImage(camImage);
+			sendingFrame.frame = camimg;
 			
 			//Background subtraction without learning background
 			Mat fgMask = new Mat();
@@ -166,7 +164,6 @@ public class Main {
 				}
 				
 				//Write frame to video
-				BufferedImage camimg = matToBufferedImage(camImage);
 				writer.encodeVideo(0, camimg, System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
 				
 				//If writer4android is open, write frame to android video also
