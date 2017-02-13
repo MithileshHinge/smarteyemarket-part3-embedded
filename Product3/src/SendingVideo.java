@@ -26,7 +26,7 @@ public class SendingVideo extends Thread {
 		try {
 			InetSocketAddress listenAddr = new InetSocketAddress(port);
 			listener = ServerSocketChannel.open();
-			ServerSocket ssVdo = new ServerSocket(port);
+			ServerSocket ssVdo = listener.socket();
 			ssVdo.setReuseAddress(true);
 			ssVdo.bind(listenAddr);
 		} catch (IOException e) {
