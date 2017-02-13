@@ -1,9 +1,7 @@
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.awt.image.WritableRaster;
-import java.io.IOException;
 import java.io.OutputStream;
-import java.net.ServerSocket;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
@@ -15,11 +13,10 @@ import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
+import org.opencv.highgui.VideoCapture;
 import org.opencv.imgproc.Imgproc;
 import org.opencv.objdetect.CascadeClassifier;
 import org.opencv.video.BackgroundSubtractorMOG2;
-import org.opencv.video.Video;
-import org.opencv.videoio.VideoCapture;
 
 import com.xuggle.mediatool.IMediaWriter;
 import com.xuggle.mediatool.ToolFactory;
@@ -33,10 +30,11 @@ public class Main {
 	private static boolean detectFace = true;
 	private static boolean faceNotCovered = false;
 	
-	public static final String outputFilename = "//Users//mithileshhinge//Desktop//videos//";
+	public static final String outputFilename = "C://Users//Home//Desktop//videos//";
 	public static IMediaWriter writer;
 	public static boolean startStoring = true;
 	public static long startTime;
+	public static long startTime4android;
 	public static Date dNow;
 	public static SimpleDateFormat ft = new SimpleDateFormat("yyyy_MM_dd'at'hh_mm_ss_a");
 	public static boolean writer_close = false;
@@ -44,9 +42,8 @@ public class Main {
 	public static String store_file_name;
 	static OutputStream out;
 	public static int myNotifId = 1;
-	private static boolean vid_small = true;
 	
-	public static final String outputFilename4android = "//Users//mithileshhinge//Desktop//videos4android//";
+	public static final String outputFilename4android = "C://Users//Home//Desktop//videos4android//";
 	public static final byte BYTE_FACEFOUND_VDOGENERATING = 1, BYTE_FACEFOUND_VDOGENERATED = 2, BYTE_ALERT1 = 3, BYTE_ALERT2 = 4;
 	public static IMediaWriter writer4android;
 	public static boolean writer_close4android = false;
@@ -88,15 +85,15 @@ public class Main {
 			return;
 		}
 		
-		BackgroundSubtractorMOG2 backgroundSubtractorMOG = Video.createBackgroundSubtractorMOG2(333, 16, false);
+		BackgroundSubtractorMOG2 backgroundSubtractorMOG =new BackgroundSubtractorMOG2(333, 16, false);
 		
-		frontal_face_cascade = new CascadeClassifier("//Users//mithileshhinge//Desktop//haarcascades//haarcascade_frontalface_alt.xml");
+		frontal_face_cascade = new CascadeClassifier("C://Users//Home//Desktop//haarcascades//haarcascade_frontalface_alt.xml");
 		if (frontal_face_cascade.empty()) {
 			System.out.println("--(!)Error loading Front Face Cascade\n");
 			return;
 		} else System.out.println("Front Face classifier loaded");
 		
-		mouthCascade = new CascadeClassifier("//Users//mithileshhinge//Desktop//haarcascades//Mouth.xml");
+		mouthCascade = new CascadeClassifier("C://Users//Home//Desktop//haarcascades//Mouth.xml");
 		if(mouthCascade.empty()){
 			System.out.println("--(!)Error loading Mouth Cascade\n");
 			return;
@@ -153,11 +150,15 @@ public class Main {
 				
 				//Start recording video just after bg changes
 				if (startStoring){
+					System.out.println("..........................recording started...................................");
 					time3 = System.currentTimeMillis();
 					store_name = outputFilename + ft.format(dNow) + ".mp4";
 					store_file_name = ft.format(dNow);
 					writer = ToolFactory.makeWriter(store_name);
 					writer.addVideoStream(0, 0, ICodec.ID.CODEC_ID_MPEG4, 640, 480);
+					/*store_name4android = outputFilename4android + ft.format(dNow) + ".mp4";
+					writer4android = ToolFactory.makeWriter(store_name4android);
+					writer4android.addVideoStream(0, 0, ICodec.ID.CODEC_ID_MPEG4, 640, 480);*/
 					startTime = System.nanoTime();
 					writer_close = true;
 					startStoring = false;
@@ -167,8 +168,9 @@ public class Main {
 				writer.encodeVideo(0, camimg, System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
 				
 				//If writer4android is open, write frame to android video also
-				if (writer4android.isOpen()){
-					if (timeAndroidVdoStarted!=-1 && (timeAndroidVdoStarted-System.currentTimeMillis())/1000 >= 10){
+				if (writer4android != null){
+					if(writer4android.isOpen()){
+					if (timeAndroidVdoStarted!=-1 && (System.currentTimeMillis()-timeAndroidVdoStarted)/1000 >= 3){
 						writer4android.close();
 						sendingVideo.notifId2filepaths.put(new Integer(myNotifId), store_name4android);
 						notifThread.p = BYTE_FACEFOUND_VDOGENERATED;
@@ -176,7 +178,8 @@ public class Main {
 						notifThread.sendNotif = true;
 						myNotifId++;
 					}else {
-						writer4android.encodeVideo(0, camimg, System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
+						writer4android.encodeVideo(0, camimg, System.nanoTime() - startTime4android, TimeUnit.NANOSECONDS);
+					}
 					}
 				}
 				frame_no++;
@@ -192,7 +195,7 @@ public class Main {
 
 					for (Rect rect : front_faces.toArray()) {
 						Point center = new Point(rect.x + rect.width * 0.5, rect.y + rect.height * 0.5);
-						Imgproc.ellipse(camImage, center, new Size(rect.width * 0.5, rect.height * 0.5), 0, 0, 360,
+						Core.ellipse(camImage, center, new Size(rect.width * 0.5, rect.height * 0.5), 0, 0, 360,
 								new Scalar(0, 255, 0), 4, 8, 0);
 					}
 					
@@ -209,6 +212,7 @@ public class Main {
 							
 							//If alert1 is not given, then start storing video4android | else, close the writer
 							if (!alert1given){
+								notifThread.notifFrame = camimg;
 								notifThread.p = BYTE_FACEFOUND_VDOGENERATING;
 								notifThread.myNotifId = myNotifId;
 								notifThread.sendNotif = true;
@@ -216,7 +220,9 @@ public class Main {
 								store_name4android = outputFilename4android + ft.format(dNow) + ".mp4";
 								writer4android = ToolFactory.makeWriter(store_name4android);
 								writer4android.addVideoStream(0, 0, ICodec.ID.CODEC_ID_MPEG4, 640, 480);
+								startTime4android = System.nanoTime();
 								timeAndroidVdoStarted = System.currentTimeMillis();
+								
 							}else {
 								writer4android.close();
 								sendingVideo.notifId2filepaths.put(new Integer(myNotifId), store_name4android);
@@ -230,9 +236,10 @@ public class Main {
 				}
 				
 				//Give alert1 and start writer4android
-				if (noFaceAlert && !alert1given && blackCountPercent<85 && (time4-time3)/1000 > 3 && !notifThread.sendNotif){
+				if (noFaceAlert && !alert1given && blackCountPercent<85 && (time4-time3)/1000 > 3 ){            //notifthrad dependent
 					alert1given = true;
 					System.out.println("warn level 1.......................");
+					notifThread.notifFrame = camimg;
 					notifThread.p = BYTE_ALERT1;
 					notifThread.myNotifId = myNotifId;
 					notifThread.sendNotif = true;
@@ -240,6 +247,7 @@ public class Main {
 					store_name4android = outputFilename4android + ft.format(dNow) + ".mp4";
 					writer4android = ToolFactory.makeWriter(store_name4android);
 					writer4android.addVideoStream(0, 0, ICodec.ID.CODEC_ID_MPEG4, 640, 480);
+					startTime4android = System.nanoTime();
 					time3 = System.currentTimeMillis();
 					timeAndroidVdoStarted = -1;
 					
@@ -263,9 +271,23 @@ public class Main {
 				}
 				
 				
+				
 			}else {
 				dNow = new Date();
 				startStoring = true;
+				
+				
+				
+				if(notifThread.p ==BYTE_FACEFOUND_VDOGENERATING || notifThread.p==BYTE_ALERT1)
+				{
+					System.out.println("abrupt end...........................");
+					writer4android.close();
+					sendingVideo.notifId2filepaths.put(new Integer(myNotifId), store_name4android);
+					notifThread.p = 5;
+					notifThread.myNotifId = myNotifId;
+					notifThread.sendNotif = true;
+					myNotifId++;
+				}
 				
 				//Writer close once bg becomes normal
 				if (writer_close){
@@ -273,6 +295,8 @@ public class Main {
 					writer_close = false;
 					alert1given = false;
 					alert2given = false;
+					noFaceAlert = true;
+					timeAndroidVdoStarted = -1;
 					SendMail.sendmail_vdo = true;
 					once = false;
 				}
