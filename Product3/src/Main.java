@@ -76,8 +76,6 @@ public class Main {
 		NotificationThread notifThread = new NotificationThread();
 		notifThread.start();
 		
-		SendMail t3 = new SendMail();
-		t3.start();
 		
 		VideoCapture capture = new VideoCapture(1);
 		if (!capture.isOpened()) {
@@ -287,6 +285,7 @@ public class Main {
 					notifThread.myNotifId = myNotifId;
 					notifThread.sendNotif = true;
 					myNotifId++;
+					SendMail.sendmail_notif = true;
 				}
 				
 				//Writer close once bg becomes normal
@@ -298,6 +297,8 @@ public class Main {
 					noFaceAlert = true;
 					timeAndroidVdoStarted = -1;
 					SendMail.sendmail_vdo = true;
+					SendMail sendMail = new SendMail();
+					sendMail.start();
 					once = false;
 				}
 				detectFace = true;
