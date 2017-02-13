@@ -2,24 +2,33 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.channels.FileChannel;
+import java.nio.channels.ServerSocketChannel;
+import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 
 public class SendingVideo extends Thread {
 	
 	private int port = 6668;
-	private ServerSocket ssVdo;
+	private ServerSocketChannel listener = null;
 	private int beginIndex = Main.outputFilename4android.length();
 	
 	HashMap<Integer, String> notifId2filepaths = new HashMap<>();
 	
 	public SendingVideo(){
 		try {
-			ssVdo = new ServerSocket(port);
+			InetSocketAddress listenAddr = new InetSocketAddress(port);
+			listener = ServerSocketChannel.open();
+			ServerSocket ssVdo = new ServerSocket(port);
+			ssVdo.setReuseAddress(true);
+			ssVdo.bind(listenAddr);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -29,7 +38,9 @@ public class SendingVideo extends Thread {
 	public void run() {
 		while(true){
 			try {
-				Socket s = ssVdo.accept();
+				SocketChannel sc = listener.accept();
+				sc.configureBlocking(true);
+				Socket s = sc.socket();
 				InputStream sIn = s.getInputStream();
 				DataInputStream dIn = new DataInputStream(sIn);
 				OutputStream sOut = s.getOutputStream();
@@ -44,7 +55,7 @@ public class SendingVideo extends Thread {
 				sOut.flush();
 				sIn.read();
 				if (filepath != null){
-					sendVideo(sOut, filepath);
+					sendVideo(sc, filepath);
 				}
 				s.close();
 			} catch (IOException e) {
@@ -54,9 +65,9 @@ public class SendingVideo extends Thread {
 		}
 	}
 	
-	private void sendVideo(OutputStream out, String filepath){
+	private void sendVideo(SocketChannel sc, String filepath){
 		
-		FileInputStream fileIn = null;
+		/*FileInputStream fileIn = null;
 		try {
 			File file = new File(filepath);
 			fileIn = new FileInputStream(file);
@@ -75,7 +86,16 @@ public class SendingVideo extends Thread {
 				e.printStackTrace();
 			}
 
+		}*/
+		
+		try {
+			FileChannel fc = new FileInputStream(filepath).getChannel();
+			fc.transferTo(0, fc.size(), sc);
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
+		
+		
 	}
 
 }
