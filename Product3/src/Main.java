@@ -30,6 +30,14 @@ public class Main {
 	private static boolean detectFace = true;
 	private static boolean faceNotCovered = false;
 	
+	
+	private static boolean LightRef = true;
+    static int intialBlack;
+    static int RefBlack;
+    static int lightCount = 0;
+	
+    
+	
 	public static final String outputFilename = "C://Users//Home//Desktop//videos//";
 	public static IMediaWriter writer;
 	public static boolean startStoring = true;
@@ -61,8 +69,12 @@ public class Main {
 	public static boolean alert1given = false;
 	public static int framesRead = 0;
 	
-	static {
+	/*static {
 		System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+	}*/
+	
+	static {
+		System.loadLibrary("opencv_java248");
 	}
 	
 	public static void main(String[] args) {
@@ -150,6 +162,7 @@ public class Main {
 				
 				//Start recording video just after bg changes
 				if (startStoring){
+					LightRef = true;
 					System.out.println("..........................recording started...................................");
 					time3 = System.currentTimeMillis();
 					store_name = outputFilename + ft.format(dNow) + ".mp4";
@@ -235,8 +248,33 @@ public class Main {
 					}
 				}
 				
+				if( ((System.currentTimeMillis()-time3) > 2400) && (System.currentTimeMillis()-time3) < 4500 )
+				{ 
+					
+					System.out.println("...............Detecting light change started");
+					if(LightRef){
+						RefBlack =blackCountPercent;
+						LightRef=false;
+						System.out.println("Refblack = " + RefBlack);
+					}else {
+					   
+						int	diffBlack= Math.abs(RefBlack-blackCountPercent);
+						if(diffBlack <3 && RefBlack < 75 )
+							lightCount++;
+						if(lightCount >= 6){
+							lightCount = 0;
+							notifThread.p=6;
+							notifThread.sendNotif=true;
+							framesRead=250;
+							System.out.println("...............Light Change Confirmed");
+						}
+						
+					}
+					
+				}
+				
 				//Give alert1 and start writer4android
-				if (noFaceAlert && !alert1given && blackCountPercent<85 && (time4-time3)/1000 > 3 ){            //notifthrad dependent
+				if (noFaceAlert && !alert1given && blackCountPercent<85 && (time4-time3)/1000 > 5 ){            //notifthrad dependent
 					alert1given = true;
 					System.out.println("warn level 1.......................");
 					notifThread.notifFrame = camimg;
@@ -312,6 +350,7 @@ public class Main {
 			time4 = System.currentTimeMillis();
 			timeNow2 = System.currentTimeMillis();
 			System.out.println(timeNow2 - timeNow1);
+			
 			System.out.println("frmes_read" + framesRead);
 			timeNow1 = timeNow2;
 		}
