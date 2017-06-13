@@ -85,6 +85,9 @@ public class Main {
 		SendingVideo sendingVideo = new SendingVideo();
 		sendingVideo.start();
 		
+		SendingAudio sendingAudio = new SendingAudio();
+		sendingAudio.start();
+		
 		NotificationThread notifThread = new NotificationThread();
 		notifThread.start();
 		
