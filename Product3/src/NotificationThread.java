@@ -193,6 +193,7 @@ public class NotificationThread extends Thread {
 				}
 			} else {
 				try {
+					
 					Thread.sleep(0, 10000);
 				} catch (InterruptedException e1) {
 					System.out.println(String.format("connection_problem re bawa!!!"));

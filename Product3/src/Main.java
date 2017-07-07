@@ -1,8 +1,12 @@
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.awt.image.WritableRaster;
 import java.io.OutputStream;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
@@ -24,21 +28,22 @@ import com.xuggle.xuggler.ICodec;
 
 public class Main {
 
+	static boolean LightChange = false;
+    static int h;
+    static int w;
+    static int grid_bc = 0;
+    static int blk_grid = 0;
+    static int grid_length = 0;
+    static int itr = 0;
+	
 	private static CascadeClassifier frontal_face_cascade;
 	private static CascadeClassifier mouthCascade;
 	static int frame_no = 0;
 	private static boolean detectFace = true;
 	private static boolean faceNotCovered = false;
 	
-	
-	private static boolean LightRef = true;
-    static int intialBlack;
-    static int RefBlack;
-    static int lightCount = 0;
-	
-    
-	
-	public static final String outputFilename = "C://Users//Home//Desktop//videos//";
+	public static final String outputFilename = "F://videos//";
+	//public static final String outputFilename = "//home//odroid//Desktop//videos//";
 	public static IMediaWriter writer;
 	public static boolean startStoring = true;
 	public static long startTime;
@@ -51,7 +56,8 @@ public class Main {
 	static OutputStream out;
 	public static int myNotifId = 1;
 	
-	public static final String outputFilename4android = "C://Users//Home//Desktop//videos4android//";
+	public static final String outputFilename4android = "F://videos4android//";
+	//public static final String outputFilename4android = "//home//odroid//Desktop//videos4android//";
 	public static final byte BYTE_FACEFOUND_VDOGENERATING = 1, BYTE_FACEFOUND_VDOGENERATED = 2, BYTE_ALERT1 = 3, BYTE_ALERT2 = 4;
 	public static IMediaWriter writer4android;
 	public static boolean writer_close4android = false;
@@ -60,8 +66,8 @@ public class Main {
 	static long timeNow1, timeNow2;
 	static long time3, time4;
 	public static long timeAndroidVdoStarted = -1;
-	public static boolean j = false;
-	
+	public static boolean j = true;
+	public static boolean checkonce =true;
 	public static Process proc;
 	//Disable auto focus of camera through terminal
 	
@@ -69,18 +75,19 @@ public class Main {
 	public static boolean alert1given = false;
 	public static int framesRead = 0;
 	
-	/*static {
-		System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
-	}*/
+	public static boolean Surv_Mode=true;
 	
 	static {
-		System.loadLibrary("opencv_java248");
+		System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
 	}
 	
 	public static void main(String[] args) {
 		
 		SendingFrame sendingFrame = new SendingFrame();
 		sendingFrame.start();
+		
+		SendingAudio audio = new SendingAudio();
+		audio.start();
 		
 		SendingVideo sendingVideo = new SendingVideo();
 		sendingVideo.start();
@@ -91,6 +98,9 @@ public class Main {
 		SendMail t3 = new SendMail();
 		t3.start();
 		
+		Settingsmsd settingsmsd = new Settingsmsd();
+		settingsmsd.start();		
+		
 		VideoCapture capture = new VideoCapture(1);
 		if (!capture.isOpened()) {
 			System.out.println("Error - cannot open camera!");
@@ -99,13 +109,15 @@ public class Main {
 		
 		BackgroundSubtractorMOG2 backgroundSubtractorMOG =new BackgroundSubtractorMOG2(333, 16, false);
 		
-		frontal_face_cascade = new CascadeClassifier("C://Users//Home//Desktop//haarcascades//haarcascade_frontalface_alt.xml");
+		frontal_face_cascade = new CascadeClassifier("F://haarcascades//haarcascade_frontalface_alt.xml");
+		//frontal_face_cascade = new CascadeClassifier("//home//odroid//Desktop//haarcascades//haarcascade_frontalface_alt.xml");
 		if (frontal_face_cascade.empty()) {
 			System.out.println("--(!)Error loading Front Face Cascade\n");
 			return;
 		} else System.out.println("Front Face classifier loaded");
 		
-		mouthCascade = new CascadeClassifier("C://Users//Home//Desktop//haarcascades//Mouth.xml");
+		mouthCascade = new CascadeClassifier("F://haarcascades//Mouth.xml");
+		//mouthCascade = new CascadeClassifier("//home//odroid//Desktop//haarcascades//Mouth.xml");
 		if(mouthCascade.empty()){
 			System.out.println("--(!)Error loading Mouth Cascade\n");
 			return;
@@ -128,11 +140,30 @@ public class Main {
 			}
 			
 			//Send frame via live-feed
-			BufferedImage camimg = matToBufferedImage(camImage);
+			BufferedImage cam_img = matToBufferedImage(camImage);
+			BufferedImage camimg = timestampIt(cam_img);
 			sendingFrame.frame = camimg;
+			
+			if (!Surv_Mode && checkonce){
+				System.out.println("..........................recording started...................................");
+				time3 = System.currentTimeMillis();
+				store_name = outputFilename + ft.format(dNow) + ".mp4";
+				store_file_name = ft.format(dNow);
+				writer = ToolFactory.makeWriter(store_name);
+				writer.addVideoStream(0, 0, ICodec.ID.CODEC_ID_MPEG4, 640, 480);
+				/*store_name4android = outputFilename4android + ft.format(dNow) + ".mp4";
+				writer4android = ToolFactory.makeWriter(store_name4android);
+				writer4android.addVideoStream(0, 0, ICodec.ID.CODEC_ID_MPEG4, 640, 480);*/
+				startTime = System.nanoTime();
+				checkonce =false;
+			}
+			if (!Surv_Mode){
+				writer.encodeVideo(0, camimg, System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
+			}
 			
 			//Background subtraction without learning background
 			Mat fgMask = new Mat();
+			Mat frameRef = new Mat();
 			
 			if (j) {
 				backgroundSubtractorMOG.apply(camImage, fgMask, -1);
@@ -153,16 +184,12 @@ public class Main {
 			Mat output = new Mat();
 			camImage.copyTo(output, fgMask);
 			
-			/*
-			 * TODO: Discussion to handle lighting change and peephole covering
-			 */
 			
 			//Consider background change if black % is less that 97
 			if (blackCountPercent < 97 && framesRead > 333) {
 				
 				//Start recording video just after bg changes
-				if (startStoring){
-					LightRef = true;
+				if (startStoring && Surv_Mode){
 					System.out.println("..........................recording started...................................");
 					time3 = System.currentTimeMillis();
 					store_name = outputFilename + ft.format(dNow) + ".mp4";
@@ -172,14 +199,17 @@ public class Main {
 					/*store_name4android = outputFilename4android + ft.format(dNow) + ".mp4";
 					writer4android = ToolFactory.makeWriter(store_name4android);
 					writer4android.addVideoStream(0, 0, ICodec.ID.CODEC_ID_MPEG4, 640, 480);*/
+					System.out.println("''''''''''''''writer created succesfully''''''''''''''''''''''''");
 					startTime = System.nanoTime();
 					writer_close = true;
 					startStoring = false;
+					
 				}
 				
-				//Write frame to video
+				//Write frame to video only when surveillance mode is ON
+				if(Surv_Mode){
 				writer.encodeVideo(0, camimg, System.nanoTime() - startTime, TimeUnit.NANOSECONDS);
-				
+				}
 				//If writer4android is open, write frame to android video also
 				if (writer4android != null){
 					if(writer4android.isOpen()){
@@ -248,30 +278,40 @@ public class Main {
 					}
 				}
 				
-				if( ((System.currentTimeMillis()-time3) > 2400) && (System.currentTimeMillis()-time3) < 4500 )
+				if((System.currentTimeMillis()-time3) < 4500 && !LightChange && itr>3)
 				{ 
-					
-					System.out.println("...............Detecting light change started");
-					if(LightRef){
-						RefBlack =blackCountPercent;
-						LightRef=false;
-						System.out.println("Refblack = " + RefBlack);
-					}else {
-					   
-						int	diffBlack= Math.abs(RefBlack-blackCountPercent);
-						if(diffBlack <3 && RefBlack < 75 )
-							lightCount++;
-						if(lightCount >= 6){
-							lightCount = 0;
-							notifThread.p=6;
+					  backgroundSubtractorMOG.apply(camImage, frameRef, 0);
+					  System.out.println("...............Detecting light change started");
+					  int h = frameRef.height();
+					  int w = frameRef.width();
+					  System.out.println("h = "+h+"	w = "+w);
+					  byte[] buffLight = new byte[(int) (frameRef.total() * frameRef.channels())];
+					  frameRef.get(0, 0, buffLight);
+					  
+					  for(int k=0;k<=5;k++){
+						  for(int m=0;m<=7;m++){
+							  for(int n=0;n<1;n++){
+								  for(int i=((k*w*h/6)+(m*w/8)+(n*w));i<((k*w*h/6)+(m*w/8)+(n*w)+1);i++){
+									  System.out.println(".........................");
+									  if (buffLight[i] == 0) {
+										  	System.out.println("&&&&&&&&&&&&&&&&&&");
+											grid_bc++;
+										}
+								  }
+							  }
+						  }  
+					  }	
+					  System.out.println("grid_bc = "+grid_bc);
+					  if(grid_bc<7){
+						  	LightChange = true;
+						    notifThread.p=6;
 							notifThread.sendNotif=true;
-							framesRead=250;
+							framesRead=0;
 							System.out.println("...............Light Change Confirmed");
-						}
-						
-					}
-					
+					  }
+					  grid_bc = 0;
 				}
+				itr++;
 				
 				//Give alert1 and start writer4android
 				if (noFaceAlert && !alert1given && blackCountPercent<85 && (time4-time3)/1000 > 5 ){            //notifthrad dependent
@@ -289,8 +329,8 @@ public class Main {
 					time3 = System.currentTimeMillis();
 					timeAndroidVdoStarted = -1;
 					
-					AudioPlaying audioPlaying = new AudioPlaying();
-					audioPlaying.start();
+					//AudioPlaying audioPlaying = new AudioPlaying();
+					//audioPlaying.start();
 				}
 				
 				//Give alert2 and close writer4android
@@ -311,13 +351,16 @@ public class Main {
 				
 				
 			}else {
+				
+				frameRef = camImage;
+				
+				LightChange = false;
 				dNow = new Date();
 				startStoring = true;
 				
 				
 				
-				if(notifThread.p ==BYTE_FACEFOUND_VDOGENERATING || notifThread.p==BYTE_ALERT1)
-				{
+				if(notifThread.p ==BYTE_FACEFOUND_VDOGENERATING || notifThread.p==BYTE_ALERT1){
 					System.out.println("abrupt end...........................");
 					writer4android.close();
 					sendingVideo.notifId2filepaths.put(new Integer(myNotifId), store_name4android);
@@ -418,6 +461,21 @@ public class Main {
 		frame.get(0, 0, data);
 		return image;
 		
+	}
+	private static BufferedImage timestampIt(BufferedImage toEdit){
+		BufferedImage dest = new BufferedImage(toEdit.getWidth(), toEdit.getHeight(),  BufferedImage.TYPE_3BYTE_BGR);
+		
+	    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	    String dateTime = sdf.format(Calendar.getInstance().getTime()); // reading local time in the system
+	    
+	    Graphics2D g2 = dest.createGraphics();
+	    //Color darkgreen= new Color(28,89,71);
+	    Color darkgreen= new Color(0,0,0);
+	    g2.drawImage(toEdit, 0, 0, toEdit.getWidth(), toEdit.getHeight(), null);
+	    g2.setColor(darkgreen);
+	    g2.setFont(new Font("TimesRoman", Font.PLAIN, 25)); 
+	    g2.drawString(dateTime, 400, 450);
+	    return dest;
 	}
 	
 

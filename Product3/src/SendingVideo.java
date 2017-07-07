@@ -1,8 +1,6 @@
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -21,6 +19,7 @@ public class SendingVideo extends Thread {
 	private int beginIndex = Main.outputFilename4android.length();
 	
 	HashMap<Integer, String> notifId2filepaths = new HashMap<>();
+	private FileInputStream fileInputStream;
 	
 	public SendingVideo(){
 		try {
@@ -89,7 +88,8 @@ public class SendingVideo extends Thread {
 		}*/
 		
 		try {
-			FileChannel fc = new FileInputStream(filepath).getChannel();
+			fileInputStream = new FileInputStream(filepath);
+			FileChannel fc = fileInputStream.getChannel();
 			fc.transferTo(0, fc.size(), sc);
 		} catch (IOException e) {
 			e.printStackTrace();
